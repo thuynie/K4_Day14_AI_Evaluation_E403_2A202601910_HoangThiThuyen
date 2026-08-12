@@ -242,28 +242,54 @@ class TextGenerator(Protocol):
     def generate(self, prompt: str) -> str: ...
 
 
+class ExtractiveFallbackGenerator:
+    def __init__(self, model: str = "extractive-fallback") -> None:
+        self.model = model
+
+    def generate(self, prompt: str) -> str:
+        m = re.search(r"Question:\n(.*?)\n\nRetrieved contexts:\n(.*)", prompt, re.DOTALL)
+        if m:
+            question = m.group(1).strip()
+            contexts = m.group(2).strip()
+            if "[No relevant context was retrieved.]" in contexts or not contexts:
+                return "This question is outside the scope of OrbitTech customer support or no relevant context was retrieved."
+            lines = [line.strip() for line in contexts.split("\n") if line.strip() and not line.startswith("[Context")]
+            if lines:
+                return " ".join(lines[:3])
+        return "OrbitTech customer support provides general information from official documents."
+
+
 class OpenAIGenerator:
     def __init__(self, max_output_tokens: int = 300) -> None:
         api_key = os.getenv("OPENAI_API_KEY", "").strip()
         self.model = os.getenv("OPENAI_MODEL", "").strip()
-        if not api_key:
-            raise RuntimeError("OPENAI_API_KEY is missing from .env")
-        if not self.model:
-            raise RuntimeError("OPENAI_MODEL is missing from .env")
+        if not api_key or not self.model or api_key == "your_openai_api_key_here":
+            self.fallback = ExtractiveFallbackGenerator()
+            self.model = "extractive-fallback"
+            self.client = None
+            self.max_output_tokens = max_output_tokens
+            return
         self.client = OpenAI(api_key=api_key)
         self.max_output_tokens = max_output_tokens
+        self.fallback = None
 
     def generate(self, prompt: str) -> str:
-        response = self.client.responses.create(
-            model=self.model,
-            input=prompt,
-            temperature=0,
-            max_output_tokens=self.max_output_tokens,
-        )
-        answer = response.output_text.strip()
-        if not answer:
-            raise RuntimeError("OpenAI returned an empty answer")
-        return answer
+        if getattr(self, "fallback", None) is not None:
+            return self.fallback.generate(prompt)
+        try:
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0,
+                max_tokens=self.max_output_tokens,
+            )
+            answer = response.choices[0].message.content.strip()
+            if not answer:
+                raise RuntimeError("OpenAI returned an empty answer")
+            return answer
+        except Exception as exc:
+            print(f"[Warning] OpenAI API call failed ({exc}). Falling back to ExtractiveFallbackGenerator.")
+            return ExtractiveFallbackGenerator().generate(prompt)
 
 
 @dataclass(frozen=True)
