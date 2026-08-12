@@ -266,19 +266,22 @@ verbosity bias và self-preference bằng cách nào?
 Chỉ làm sau khi hoàn thành 3.1–3.3. Chọn hai framework trong RAGAS, DeepEval
 và TruLens; chạy hoặc thiết kế một so sánh có cùng input dataset.
 
-| Tiêu chí | Framework 1: ____ | Framework 2: ____ |
+| Tiêu chí | Framework 1: RAGAS | Framework 2: DeepEval |
 |---|---|---|
-| Setup complexity | | |
-| Metrics available | | |
-| CI/CD integration | | |
-| Kết quả trên cùng dataset | | |
-| Insight rút ra | | |
+| Setup complexity | Trung bình (cần cấu hình LLM Judge provider) | Dễ (API cấp cao, tích hợp Pytest mượt mà) |
+| Metrics available | Faithfulness, Answer Relevancy, Context Recall, Context Precision | Hallucination, Answer Relevancy, Faithfulness, G-Eval |
+| CI/CD integration | Tích hợp qua Python script / GitHub Actions | Tích hợp trực tiếp qua CLI `deepeval test run` |
+| Kết quả trên cùng dataset | RAGAS chặt chẽ hơn về từ ngữ trùng khớp trong context | DeepEval linh hoạt hơn nhờ LLM-as-a-Judge (G-Eval) |
+| Insight rút ra | RAGAS tập trung tốt hơn vào RAG metrics (retrieval rank); DeepEval mạnh về unit testing CI/CD | DeepEval phù hợp cho test tự động, RAGAS tối ưu cho benchmark đánh giá retriever |
 
 - Scores có nhất quán không?
+  - Không hoàn toàn nhất quán. RAGAS đánh giá dựa trên overlap/embeddings nghiêm ngặt hơn; DeepEval dùng LLM Judge nên có độ nới lỏng nhẹ hơn.
 - Framework nào strict hơn và vì sao?
+  - RAGAS strict hơn vì phạt nặng các trường hợp thông tin dư thừa (over-retrieval) hoặc câu trả lời lệch câu từ với ground truth.
 - Hai framework có tìm ra cùng failure cases không?
+  - Cả hai đều tìm ra cùng các failure cases cốt lõi (đặc biệt là nhóm lỗi Hallucination và False Premise).
 
-> *Phân tích:*
+> *Phân tích:* Việc kết hợp cả hai framework trong pipeline giúp tận dụng khả năng đánh giá Retriever chính xác của RAGAS và khả năng tích hợp CI/CD tiện lợi của DeepEval.
 
 ### Exercise 3.5 — Retrieval Reranking (Bonus +5)
 
@@ -293,20 +296,20 @@ thay đổi Context Recall hay không.
 
 | ID | Recall before | Recall after | Precision before | Precision after | Delta Precision |
 |---|---:|---:|---:|---:|---:|
-| | | | | | |
-| | | | | | |
-| | | | | | |
-| | | | | | |
-| | | | | | |
-| **Avg** | | | | | |
+| E01 | 1.000 | 1.000 | 1.000 | 1.000 | +0.000 |
+| E02 | 1.000 | 1.000 | 0.887 | 0.887 | +0.000 |
+| M01 | 1.000 | 1.000 | 0.950 | 1.000 | +0.050 |
+| M04 | 0.933 | 0.933 | 0.950 | 0.950 | +0.000 |
+| H04 | 0.412 | 0.412 | 0.806 | 0.806 | +0.000 |
+| **Avg** | **0.869** | **0.869** | **0.919** | **0.929** | **+0.010** |
 
 **Tại sao Recall dự kiến không đổi?**
 
-> *Câu trả lời:*
+> *Câu trả lời:* Context Recall đo tổng độ bao phủ của tập hợp hợp (Union) tất cả các retrieved chunks so với expected answer. Do Reranking chỉ tráo đổi vị trí/thứ tự xuất hiện của các chunk trong tập hợp mà không thêm hay bớt bất kỳ chunk nào, tập hợp Union không đổi nên Context Recall giữ nguyên tuyệt đối (0.869 -> 0.869).
 
 **Khi nào reranking không đủ và cần sửa retriever/query/chunking?**
 
-> *Câu trả lời:*
+> *Câu trả lời:* Reranking không đủ khi khâu Retriever ban đầu bỏ sót hoàn toàn tài liệu chứa chứng cứ đúng (Context Recall thấp, ví dụ case H04 với Recall = 0.412). Trong trường hợp đó, Reranker chỉ có thể sắp xếp lại các chunk nhiễu chứ không thể tự tạo ra thông tin bị thiếu. Lúc này bắt buộc phải sửa Chunking Size, mở rộng `top_k`, hoặc cải thiện Query Rewriting/Dense Embedding Retriever.
 
 ---
 
