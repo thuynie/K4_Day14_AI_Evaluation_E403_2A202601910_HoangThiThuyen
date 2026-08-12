@@ -1,10 +1,10 @@
 {
   "schema_version": "1.0",
   "corpus_id": "orbittech-customer-support-v1",
-  "generated_at": "2026-08-12T08:22:58.249930+00:00",
+  "generated_at": "2026-08-12T09:32:41.016977+00:00",
   "agent": {
     "name": "domain-assistant",
-    "model": "extractive-fallback",
+    "model": "gpt-4o-mini",
     "top_k": 5,
     "prompt_version": "1.0"
   },
